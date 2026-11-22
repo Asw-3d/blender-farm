@@ -494,9 +494,21 @@ cam.location = (0.1, -9.2, 2.05); cam.keyframe_insert('location', frame=120)
 target.location = (0.6, -2.8, 1.8); target.keyframe_insert('location', frame=120)
 cam.location = (0.55, -6.6, 1.65); cam.keyframe_insert('location', frame=240)
 target.location = (2.45, -2.95, 2.55); target.keyframe_insert('location', frame=240)
-for fc in cam.animation_data.action.fcurves:
+def _action_fcurves(action):
+    # Blender <= 4.3: action.fcurves langsung. >= 4.4/5.0: lewat layers->strips->channelbag.
+    if hasattr(action, 'fcurves'):
+        return list(action.fcurves)
+    fcs = []
+    for layer in action.layers:
+        for strip in layer.strips:
+            bag = getattr(strip, 'channelbag', None)
+            if bag is not None:
+                fcs.extend(bag.fcurves)
+    return fcs
+
+for fc in _action_fcurves(cam.animation_data.action):
     for kp in fc.keyframe_points: kp.interpolation = 'BEZIER'
-for fc in target.animation_data.action.fcurves:
+for fc in _action_fcurves(target.animation_data.action):
     for kp in fc.keyframe_points: kp.interpolation = 'BEZIER'
 
 # ---------- render ----------
