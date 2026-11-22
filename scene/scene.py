@@ -536,10 +536,10 @@ for i in range(3):
 
 for ri, (r, ring_mat) in enumerate(rings):
     alpha_in = ring_mat.node_tree.nodes['Principled BSDF'].inputs['Alpha']
-    for cyc in range(3):
+    for cyc in range(20):
         f0 = 1 + cyc * 72 + ri * 24
         f1 = f0 + 54
-        if f1 > 245: break
+        if f1 > 1445: break
         r.scale = (0.35, 0.35, 0.35); r.keyframe_insert('scale', frame=f0)
         alpha_in.default_value = 0.85; alpha_in.keyframe_insert('default_value', frame=f0)
         r.scale = (2.3, 2.3, 2.3); r.keyframe_insert('scale', frame=f1)
@@ -705,7 +705,7 @@ def animate_char(parts, prefix, loc, phase, head_pitch, head_yaw,
             for o in parts}
     _brow_tilt = {'normal': 0.0, 'angry': -0.34, 'sad': 0.26, 'up': 0.0}
     _brow_lift = {'normal': 0.0, 'angry': -0.012, 'sad': 0.002, 'up': 0.020}
-    for f in range(1, 242, 4):
+    for f in range(1, 1442, 4):
         dz = 0.022 * math.sin(2 * math.pi * f / 52 + phase)
         p = head_pitch(f)
         if phone_arm and p > 8:  # angguk kecil pas scroll HP
@@ -789,7 +789,7 @@ animate_char(charB, 'wargaB', (3.25, 0.9, 0), 1.7, pitchB, yawB, 'Y',
 armB = bpy.data.objects.get('wargaB_arm.001')
 if armB is not None:
     be = armB.rotation_euler.copy()
-    for f in range(1, 242, 4):
+    for f in range(1, 1442, 4):
         armB.rotation_euler = (be.x, be.y + 0.48 * math.sin(2 * math.pi * f / 30), be.z)
         armB.keyframe_insert('rotation_euler', frame=f)
     armB.rotation_euler = be
@@ -798,13 +798,13 @@ if armB is not None:
 tail = bpy.data.objects.get('cat_tail')
 if tail is not None:
     be = tail.rotation_euler.copy()
-    for f in range(1, 242, 6):
+    for f in range(1, 1442, 6):
         tail.rotation_euler = (be.x, be.y, be.z + 0.48 * math.sin(2 * math.pi * f / 36))
         tail.keyframe_insert('rotation_euler', frame=f)
     tail.rotation_euler = be
 
 # ikon ikut bob wargaA
-for f in range(1, 242, 16):
+for f in range(1, 1442, 16):
     icon.location.z = 2.02 + 0.03 * math.sin(2 * math.pi * f / 52 + 0.0) + 0.02 * math.sin(2 * math.pi * f / 26)
     icon.keyframe_insert('location', frame=f)
 icon.location.z = 2.02
@@ -970,6 +970,216 @@ try:
                 kp.interpolation = 'BEZIER'
 except Exception as e:
     print('interp kamera dilewati (default BEZIER):', e)
+
+
+# ============================================================
+# VERSI 60 DETIK — override: 1440 frame, 12 shot, crowd warga,
+# lighting siang->senja->malam->pagi, router kedua (shot 10).
+# Animasi karakter utama + kamera + cincin hero dibersihkan lalu
+# dipasang ulang di sini; loop ekor kucing/lengan/ikon sudah
+# dipanjangkan oleh patch range di badan file.
+# ============================================================
+scene.frame_start, scene.frame_end = 1, 1440
+
+def _clear_anim(objs):
+    for o in objs:
+        if o is not None and getattr(o, 'animation_data', None):
+            o.animation_data_clear()
+
+_clear_anim([cam, target] + list(charA) + list(charB))
+for _mn in ('ring0', 'ring1', 'ring2'):
+    _mm = bpy.data.materials.get(_mn)
+    if _mm is not None and _mm.node_tree.animation_data:
+        _mm.node_tree.animation_data_clear()
+for _o in bpy.data.objects:
+    if _o.name.startswith('ring') and _o.type == 'MESH':
+        _clear_anim([_o])
+
+# ---------- lighting beranimasi ----------
+_BG = world.node_tree.nodes['Background']
+for _f, _se, _sc, _fe, _ws, _wc in (
+        (1,    5.2,  (1.0, 0.88, 0.70), 0.34, 0.34, (0.08, 0.34, 0.98, 1)),
+        (300,  5.2,  (1.0, 0.88, 0.70), 0.34, 0.34, (0.08, 0.34, 0.98, 1)),
+        (360,  1.7,  (1.0, 0.52, 0.24), 0.22, 0.22, (0.05, 0.17, 0.72, 1)),
+        (480,  0.52, (0.55, 0.68, 1.0), 0.16, 0.15, (0.02, 0.06, 0.30, 1)),
+        (1080, 0.52, (0.55, 0.68, 1.0), 0.16, 0.15, (0.02, 0.06, 0.30, 1)),
+        (1320, 0.52, (0.55, 0.68, 1.0), 0.16, 0.15, (0.02, 0.06, 0.30, 1)),
+        (1400, 5.2,  (1.0, 0.88, 0.70), 0.34, 0.34, (0.08, 0.34, 0.98, 1)),
+        (1440, 5.2,  (1.0, 0.88, 0.70), 0.34, 0.34, (0.08, 0.34, 0.98, 1))):
+    sun_data.energy = _se; sun_data.keyframe_insert('energy', frame=_f)
+    sun_data.color = _sc; sun_data.keyframe_insert('color', frame=_f)
+    fill_data.energy = _fe; fill_data.keyframe_insert('energy', frame=_f)
+    _BG.inputs[1].default_value = _ws
+    _BG.inputs[1].keyframe_insert('default_value', frame=_f)
+    _BG.inputs[0].default_value = _wc
+    _BG.inputs[0].keyframe_insert('default_value', frame=_f)
+sun_data.energy = 5.2; sun_data.color = (1.0, 0.88, 0.70)
+fill_data.energy = 0.34
+_BG.inputs[1].default_value = 0.34
+_BG.inputs[0].default_value = (0.08, 0.34, 0.98, 1)
+
+# lampu titik warung: menyala hanya malam
+_lamp_data = bpy.data.lights.new('warung_point', 'POINT')
+_lamp_data.energy = 0.0
+_lamp = bpy.data.objects.new('warung_point', _lamp_data)
+scene.collection.objects.link(_lamp)
+_lamp.location = (5.0, WY, 2.35)
+for _f, _e in ((1, 0.0), (479, 0.0), (520, 55.0), (1320, 55.0),
+               (1360, 0.0), (1440, 0.0)):
+    _lamp_data.energy = _e
+    _lamp_data.keyframe_insert('energy', frame=_f)
+_lamp_data.energy = 0.0
+
+# ---------- cincin hero: denyut kontinu 1440 frame ----------
+for _ri, _rn in enumerate(('ring0', 'ring1', 'ring2')):
+    _r = bpy.data.objects.get(_rn)
+    _rm = bpy.data.materials.get(_rn)
+    if _r is None or _rm is None:
+        continue
+    _ain = _rm.node_tree.nodes['Principled BSDF'].inputs['Alpha']
+    for _cyc in range(20):
+        _f0 = 1 + _cyc * 72 + _ri * 24
+        _f1 = _f0 + 54
+        if _f1 > 1445:
+            break
+        _r.scale = (0.35, 0.35, 0.35); _r.keyframe_insert('scale', frame=_f0)
+        _ain.default_value = 0.85; _ain.keyframe_insert('default_value', frame=_f0)
+        _r.scale = (2.3, 2.3, 2.3); _r.keyframe_insert('scale', frame=_f1)
+        _ain.default_value = 0.0; _ain.keyframe_insert('default_value', frame=_f1)
+    _r.scale = (1, 1, 1)
+
+# ---------- ikon no-signal: cuma tampil di segmen frustrasi ----------
+_icon = bpy.data.objects.get('icon_bubble')
+if _icon is not None:
+    for _f, _s in ((1, 0.001), (719, 0.001), (728, 1.0), (955, 1.0),
+                   (964, 0.001), (1440, 0.001)):
+        _icon.scale = (_s, _s, _s)
+        _icon.keyframe_insert('scale', frame=_f)
+    _icon.scale = (1, 1, 1)
+
+# ---------- router kedua (pop di shot 10) ----------
+box('r2_body', (-2.92, 2.5, 3.02), (0.34, 0.13, 0.20), M['white'], bevel=0.02)
+for _dy in (-0.19, 0.19):
+    cyl('r2_ant', (-2.92, 2.5 + _dy, 3.35), 0.017, 0.46, M['black'])
+for _i in range(3):
+    sph('r2_led', (-2.845, 2.36 + _i * 0.14, 2.99), 0.016, M['led'])
+_rings2 = []
+for _i in range(3):
+    _rm2 = mat(f'ring2_{_i}', (0.45, 0.85, 1.0), 0.3,
+               emission=(0.45, 0.85, 1.0), e_strength=0.7, alpha=0.0)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.34, minor_radius=0.014,
+                                     major_segments=40, minor_segments=8,
+                                     location=(-2.84, 2.5, 3.02),
+                                     rotation=(0, math.radians(90), 0))
+    _r2 = bpy.context.object; _r2.name = f'ring2_{_i}'
+    _r2.data.materials.append(_rm2)
+    _rings2.append((_r2, _rm2))
+for _o in list(bpy.data.objects):
+    if _o.name.startswith('r2_'):
+        _bs = _o.scale.copy()
+        _o.scale = (0.001, 0.001, 0.001)
+        _o.keyframe_insert('scale', frame=1)
+        _o.keyframe_insert('scale', frame=1080)
+        _o.scale = _bs
+        _o.keyframe_insert('scale', frame=1088)
+        _o.scale = _bs
+for _ri, (_r, _rm) in enumerate(_rings2):
+    _ain = _rm.node_tree.nodes['Principled BSDF'].inputs['Alpha']
+    for _cyc in range(5):
+        _f0 = 1089 + _cyc * 72 + _ri * 24
+        _f1 = _f0 + 54
+        if _f1 > 1445:
+            break
+        _r.scale = (0.35, 0.35, 0.35); _r.keyframe_insert('scale', frame=_f0)
+        _ain.default_value = 0.85; _ain.keyframe_insert('default_value', frame=_f0)
+        _r.scale = (2.3, 2.3, 2.3); _r.keyframe_insert('scale', frame=_f1)
+        _ain.default_value = 0.0; _ain.keyframe_insert('default_value', frame=_f1)
+    _r.scale = (1, 1, 1)
+
+# ---------- crowd warga (4 chibi baru) ----------
+charC = chibi('wargaC', (2.55, -0.35, 0), M['green1'], M['pants'], phone=True)
+charD = chibi('wargaD', (-2.9, 0.9, 0), M['red'], M['pants'], phone=True,
+              skin_c=M['skin2'])
+charE = chibi('wargaE', (1.7, 2.9, 0), M['cream'], M['pants'], phone=True)
+charF = chibi('wargaF', (-2.35, -5.7, 0), M['shirt_r'], M['pants'],
+              hijab_c=M['green2'], hair=False, phone=True)
+
+# ---------- trek karakter utama versi 60 detik ----------
+pitchA60 = _track([(1, 15), (240, 17), (480, 18), (700, 19), (721, 0),
+                   (845, 0), (860, 7), (960, 7), (1000, 12), (1200, 13),
+                   (1260, 6), (1440, 8)])
+yawA60 = _track([(1, 0), (720, 0), (730, -15), (738, 15), (746, -15),
+                 (754, 10), (762, 0), (850, 0), (858, -12), (866, 12),
+                 (874, 0), (1000, 0), (1060, -18), (1120, -18), (1180, 0),
+                 (1440, 0)])
+exprA60 = [(1, 720, 'S', 'normal', False), (721, 845, 'W', 'angry', True),
+           (846, 960, 'W', 'sad', True), (961, 1200, 'S', 'normal', False),
+           (1201, 1290, 'O', 'up', False), (1291, 1440, 'S', 'up', False)]
+animate_char(charA, 'wargaA', (-1.35, -3.4, 0), 0.0, pitchA60, yawA60, 'X',
+             phone_arm=True, tap_shoe=True, expr=exprA60,
+             blinks=(90, 210, 330, 470, 590, 700, 830, 950, 1090, 1230, 1360))
+
+pitchB60 = _track([(1, 5), (100, 5), (112, 17), (124, 5), (700, 6),
+                   (1100, 6), (1240, 6), (1252, 17), (1264, 6), (1440, 6)])
+yawB60 = _track([(1, 0), (40, -20), (80, -20), (110, 16), (150, 16),
+                 (185, -12), (400, -12), (520, 14), (760, 14), (900, -16),
+                 (1150, -16), (1300, 10), (1440, 10)])
+exprB60 = [(1, 104, 'S', 'normal', False), (105, 128, 'O', 'up', False),
+           (129, 1200, 'S', 'normal', False), (1201, 1290, 'O', 'up', False),
+           (1291, 1440, 'S', 'normal', False)]
+animate_char(charB, 'wargaB', (3.25, 0.9, 0), 1.7, pitchB60, yawB60, 'Y',
+             expr=exprB60, blinks=(52, 300, 560, 820, 1080, 1330))
+
+# ---------- trek crowd ----------
+_expr_calm = [(1, 1440, 'S', 'normal', False)]
+pitchC = _track([(1, 16), (700, 17), (900, 10), (1440, 12)])
+yawC = _track([(1, 0), (500, -8), (900, 6), (1440, 0)])
+animate_char(charC, 'wargaC', (2.55, -0.35, 0), 0.9, pitchC, yawC, 'X',
+             phone_arm=True, expr=_expr_calm,
+             blinks=(150, 420, 760, 1110, 1330))
+pitchD = _track([(1, 17), (720, 18), (760, 2), (950, 4), (1100, 15),
+                 (1440, 10)])
+yawD = _track([(1, 0), (730, 0), (740, -13), (748, 13), (756, 0), (1440, 0)])
+exprD = [(1, 720, 'S', 'normal', False), (721, 960, 'W', 'angry', False),
+         (961, 1440, 'S', 'normal', False)]
+animate_char(charD, 'wargaD', (-2.9, 0.9, 0), 1.9, pitchD, yawD, 'X',
+             phone_arm=True, expr=exprD, blinks=(260, 560, 880, 1200))
+pitchE = _track([(1, 14), (1440, 14)])
+yawE = _track([(1, -6), (720, 8), (1440, -6)])
+animate_char(charE, 'wargaE', (1.7, 2.9, 0), 2.6, pitchE, yawE, 'X',
+             phone_arm=True, expr=_expr_calm, blinks=(340, 690, 1040, 1290))
+pitchF = _track([(1, 15), (1200, 15), (1260, 8), (1440, 10)])
+yawF = _track([(1, 4), (1440, 4)])
+exprF = [(1, 1200, 'S', 'normal', False), (1201, 1290, 'O', 'up', False),
+         (1291, 1440, 'S', 'normal', False)]
+animate_char(charF, 'wargaF', (-2.35, -5.7, 0), 3.4, pitchF, yawF, 'X',
+             phone_arm=True, expr=exprF, blinks=(200, 640, 980, 1380))
+
+# ---------- kamera: 12 shot x 120 frame ----------
+_shot(1, 120, (-0.6, -14.5, 3.6), (-0.4, -13.0, 3.35),
+      (0, -2, 1.2), (0, -2.2, 1.2), 24)                        # 1 wide pagi
+_shot(121, 240, (-0.35, -7.4, 1.5), (-0.65, -6.8, 1.42),
+      (-1.3, -3.4, 1.12), (-1.32, -3.4, 1.1), 32)              # 2 medium A siang
+_shot(241, 360, (0.4, -6.4, 1.9), (0.7, -5.7, 1.8),
+      (3.9, -0.3, 1.2), (3.95, -0.25, 1.18), 30)               # 3 warung senja
+_shot(361, 480, (-1.2, -11.5, 3.0), (-0.9, -10.5, 2.8),
+      (0.5, 0, 1.1), (0.5, -0.2, 1.1), 24)                     # 4 crowd malam
+_shot(481, 600, (0.15, -7.6, 1.85), (0.55, -6.6, 1.65),
+      (1.6, -3.1, 2.2), (2.45, -2.95, 2.55), 36)               # 5 router malam
+_shot(601, 720, (2.5, -12.0, 5.5), (2.2, -11.0, 5.2),
+      (0.5, 2, 0.8), (0.5, 2, 0.8), 22)                        # 6 wide tinggi
+_shot(721, 840, (-0.35, -7.4, 1.5), (-0.65, -6.8, 1.42),
+      (-1.3, -3.4, 1.12), (-1.32, -3.4, 1.1), 32)              # 7 A frustrasi
+_shot(841, 960, (-0.8, -6.2, 1.45), (-0.95, -5.8, 1.4),
+      (-1.32, -3.4, 1.1), (-1.33, -3.4, 1.08), 38)             # 8 A lebih dekat
+_shot(961, 1080, (0.3, -7.2, 2.2), (0.6, -6.4, 2.0),
+      (2.6, -3.1, 2.9), (2.6, -3.1, 2.9), 32)                  # 9 router hero
+_shot(1081, 1200, (-1.2, -1.5, 1.9), (-1.0, -1.1, 1.85),
+      (-2.9, 2.5, 2.8), (-2.9, 2.5, 2.8), 32)                  # 10 router kedua
+_shot(1201, 1320, (0.4, -6.4, 1.9), (0.7, -5.7, 1.8),
+      (3.9, -0.3, 1.2), (3.95, -0.25, 1.18), 30)               # 11 warung lega
+_shot(1321, 1440, (-0.6, -14.5, 3.6), (-0.3, -12.5, 3.3),
+      (0, -1.5, 1.3), (0, -1.7, 1.3), 24)                      # 12 wide pagi
 
 # ---------- render ----------
 if MODE == 'still':
