@@ -286,11 +286,14 @@ def link(obj, material=None, smooth=True):
     return obj
 
 def box(name, loc, dims, material, bevel=0.0, rot=(0, 0, 0)):
-    """dims = ukuran penuh (x, y, z)."""
+    """dims = ukuran penuh (x, y, z). Skala dipanggang ke mesh via data.transform:
+    transform_apply di Blender ini ikut membakar LOKASI objek ke mesh
+    (o.location jadi 0) -> part teranimasi (HP, sepatu) terbang saat di-keyframe."""
     bpy.ops.mesh.primitive_cube_add(location=loc, rotation=rot)
     o = bpy.context.object; o.name = name
-    o.dimensions = dims
-    bpy.ops.object.transform_apply(scale=True)
+    from mathutils import Matrix as _M
+    o.data.transform(_M.Diagonal((dims[0] / 2, dims[1] / 2, dims[2] / 2, 1.0)))
+    o.scale = (1, 1, 1)
     if material: o.data.materials.append(material)
     if bevel > 0:
         mod = o.modifiers.new('bev', 'BEVEL'); mod.width = bevel; mod.segments = 3
