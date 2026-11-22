@@ -17,11 +17,12 @@ def _set(obj, name, value):
         setattr(obj, name, value)
 
 scene.render.engine = 'BLENDER_EEVEE'
-_set(scene.eevee, 'taa_render_samples', 8)
+_set(scene.eevee, 'taa_render_samples', 32)
 _set(scene.eevee, 'use_soft_shadows', True)  # <= 4.x
 _set(scene.eevee, 'use_shadows', True)       # 5.x
 _set(scene.eevee, 'shadow_cube_size', '1024')
 _set(scene.eevee, 'shadow_cascade_size', '1024')
+_set(scene.eevee, 'shadow_pool_size', '1024')  # 5.x: atlas bayangan lebih besar
 _set(scene.eevee, 'use_gtao', True)
 _set(scene.eevee, 'gtao_factor', 1.1)
 _set(scene.eevee, 'gtao_distance', 4.0)
@@ -49,6 +50,8 @@ sun_data = bpy.data.lights.new('sun', 'SUN')
 sun_data.energy = 5.2
 sun_data.color = (1.0, 0.88, 0.70)  # matahari hangat
 sun_data.angle = math.radians(4.0)  # tepi bayangan lembut
+_set(sun_data, 'shadow_ray_count', 3)    # 5.x: sinar penelusuran bayangan lembut
+_set(sun_data, 'shadow_step_count', 12)  # 5.x: langkah penelusuran (anti-grain)
 sun = bpy.data.objects.new('sun', sun_data)
 scene.collection.objects.link(sun)
 sun.rotation_euler = (math.radians(48), math.radians(12), math.radians(-32))
@@ -60,6 +63,8 @@ fill_data.color = (0.72, 0.84, 1.0)  # isi dingin: bayangan agak biru
 fill = bpy.data.objects.new('fill', fill_data)
 scene.collection.objects.link(fill)
 fill.rotation_euler = (math.radians(60), 0, math.radians(140))
+_set(fill_data, 'shadow_ray_count', 2)
+_set(fill_data, 'shadow_step_count', 8)
 
 # ---------- material helpers ----------
 def mat(name, color, rough=0.85, emission=None, e_strength=0.0, alpha=None):
