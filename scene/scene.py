@@ -29,27 +29,34 @@ scene.render.resolution_x = 1080
 scene.render.resolution_y = 1920
 scene.render.resolution_percentage = 50  # iterasi cepat; final proof dinaikkan
 scene.render.fps = 24
-scene.view_settings.view_transform = 'Filmic'
-scene.view_settings.look = 'Medium Contrast'
-scene.view_settings.exposure = 0.15
+# Grading "tropis jenuh" ala referensi: AgX + Punchy (Filmik bikin pucat).
+try:
+    scene.view_settings.view_transform = 'AgX'
+    scene.view_settings.look = 'Punchy'
+except Exception:
+    scene.view_settings.view_transform = 'Filmic'
+    scene.view_settings.look = 'High Contrast'
+scene.view_settings.exposure = 0.35
 scene.frame_start, scene.frame_end = 1, 240
 
 # ---------- dunia: langit biru + matahari ----------
 world = bpy.data.worlds.new('W'); scene.world = world
 world.use_nodes = True
-world.node_tree.nodes['Background'].inputs[0].default_value = (0.16, 0.44, 0.97, 1)
-world.node_tree.nodes['Background'].inputs[1].default_value = 0.45
+world.node_tree.nodes['Background'].inputs[0].default_value = (0.08, 0.34, 0.98, 1)
+world.node_tree.nodes['Background'].inputs[1].default_value = 0.34
 
 sun_data = bpy.data.lights.new('sun', 'SUN')
-sun_data.energy = 3.6
-sun_data.angle = math.radians(3.5)  # tepi bayangan lembut
+sun_data.energy = 5.2
+sun_data.color = (1.0, 0.88, 0.70)  # matahari hangat
+sun_data.angle = math.radians(4.0)  # tepi bayangan lembut
 sun = bpy.data.objects.new('sun', sun_data)
 scene.collection.objects.link(sun)
 sun.rotation_euler = (math.radians(48), math.radians(12), math.radians(-32))
 _set(sun_data, 'shadow_cascade_max_distance', 60)
 
 fill_data = bpy.data.lights.new('fill', 'SUN')
-fill_data.energy = 0.3
+fill_data.energy = 0.38
+fill_data.color = (0.72, 0.84, 1.0)  # isi dingin: bayangan agak biru
 fill = bpy.data.objects.new('fill', fill_data)
 scene.collection.objects.link(fill)
 fill.rotation_euler = (math.radians(60), 0, math.radians(140))
@@ -126,14 +133,14 @@ def mat_image(name, path, alpha=False):
 
 # palet
 M = {
-    'road':   mat_noise('road', (0.42, 0.40, 0.38), (0.34, 0.32, 0.30), 9, 0.3),
-    'walk':   mat_noise('walk', (0.60, 0.58, 0.54), (0.50, 0.48, 0.45), 9, 0.25),
-    'grass':  mat('grass', (0.16, 0.52, 0.14)),
+    'road':   mat_noise('road', (0.58, 0.49, 0.37), (0.47, 0.39, 0.29), 9, 0.3),
+    'walk':   mat_noise('walk', (0.74, 0.67, 0.55), (0.63, 0.56, 0.45), 9, 0.25),
+    'grass':  mat('grass', (0.12, 0.56, 0.11)),
     'window': mat('window', (0.13, 0.20, 0.30), 0.25),
-    'wall_w': mat('wall_w', (0.94, 0.92, 0.87)),
-    'wall_c': mat('wall_c', (0.96, 0.85, 0.66)),
-    'wall_b': mat('wall_b', (0.72, 0.82, 0.92)),
-    'roof':   mat_noise('roof', (0.66, 0.24, 0.10), (0.55, 0.19, 0.08), 5, 0.3, 0.92),
+    'wall_w': mat('wall_w', (0.97, 0.94, 0.88)),
+    'wall_c': mat('wall_c', (0.97, 0.85, 0.62)),
+    'wall_b': mat('wall_b', (0.64, 0.79, 0.95)),
+    'roof':   mat_noise('roof', (0.74, 0.26, 0.09), (0.61, 0.20, 0.07), 5, 0.3, 0.92),
     'wood':   mat('wood', (0.45, 0.30, 0.18)),
     'wood_l': mat('wood_l', (0.62, 0.45, 0.28)),
     'pole':   mat('pole', (0.15, 0.13, 0.11), 0.9),
@@ -142,14 +149,14 @@ M = {
     'teal':   mat('teal', (0.05, 0.55, 0.52)),
     'orange': mat('orange', (0.95, 0.36, 0.12)),
     'red':    mat('red', (0.88, 0.16, 0.14)),
-    'green1': mat('green1', (0.30, 0.68, 0.25)),
-    'green2': mat('green2', (0.22, 0.58, 0.20)),
+    'green1': mat('green1', (0.22, 0.72, 0.18)),
+    'green2': mat('green2', (0.14, 0.58, 0.15)),
     'skin':   mat('skin', (0.96, 0.78, 0.60), 0.65),
     'shirt_t': mat('shirt_t', (0.05, 0.72, 0.62)),
     'shirt_r': mat('shirt_r', (0.92, 0.26, 0.20)),
     'hijab':  mat('hijab', (0.98, 0.80, 0.16)),
     'pants':  mat('pants', (0.16, 0.20, 0.30)),
-    'cloud':  mat('cloud', (1, 1, 1), 1.0, emission=(1, 1, 1), e_strength=0.25),
+    'cloud':  mat('cloud', (1, 1, 1), 1.0, emission=(1, 1, 1), e_strength=0.45),
     'led':    mat('led', (0.1, 0.9, 0.3), 0.4, emission=(0.1, 0.95, 0.3), e_strength=2.0),
     'glass':  mat('glass', (0.75, 0.88, 0.95), 0.12, alpha=0.35),
     'roof2':  mat_noise('roof2', (0.38, 0.30, 0.26), (0.30, 0.23, 0.20), 5, 0.3, 0.95),
