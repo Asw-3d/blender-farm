@@ -13,6 +13,19 @@ BOLD = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 PILL_TEXT = '1 ROUTER · 30 HP'
 CAPTIONS = []  # PR #6: caption baris dimatikan — diganti caption kata karaoke + narasi di pasca-produksi
 WATERMARK = 'BUKTI MESIN BLENDER · 01'
+# Jadwal pill versi 60 detik (aktif hanya bila jumlah frame > 300)
+PILL_SCHEDULE = [(1, 240, '1 ROUTER · 30 HP'), (241, 480, 'JAM 7 MALAM'),
+                 (481, 720, '50 Mbps DIBAGI 30'), (721, 960, 'SEMUANYA JADI LEMOT'),
+                 (961, 1200, 'SOLUSINYA ADA 3'), (1201, 1440, 'NGGAK KERJA SENDIRIAN')]
+WATERMARK_60 = 'MESIN BLENDER · VERSI 60 DETIK'
+
+
+def pill_for(f, n):
+    if n > 300:
+        for a, b, t in PILL_SCHEDULE:
+            if a <= f <= b:
+                return t
+    return PILL_TEXT
 
 def caption_for(f):
     for a, b, t in CAPTIONS:
@@ -30,12 +43,13 @@ for i, fn in enumerate(files, start=1):
     # pill atas (muncul frame 20+, pop-in halus)
     if i >= 20:
         f_pill = ImageFont.truetype(BOLD, 34)
-        tw = d.textlength(PILL_TEXT, font=f_pill)
+        ptxt = pill_for(i, len(files))
+        tw = d.textlength(ptxt, font=f_pill)
         pw, ph = tw + 56, 62
         x0, y0 = (W - pw) / 2, 54
         d.rounded_rectangle([x0, y0, x0 + pw, y0 + ph], radius=31,
                             fill=(178, 224, 32, 255), outline=(10, 12, 16, 255), width=4)
-        d.text((W / 2, y0 + ph / 2), PILL_TEXT, font=f_pill, fill=(10, 12, 16, 255), anchor='mm')
+        d.text((W / 2, y0 + ph / 2), ptxt, font=f_pill, fill=(10, 12, 16, 255), anchor='mm')
     # caption bawah
     cap = caption_for(i)
     if cap:
@@ -44,7 +58,8 @@ for i, fn in enumerate(files, start=1):
         d.text((W / 2, H - 118), cap, font=f_cap, fill=(255, 255, 255, 255), anchor='mm')
     # watermark
     f_wm = ImageFont.truetype(BOLD, 19)
-    d.text((W - 16, 18), WATERMARK, font=f_wm, fill=(255, 255, 255, 170), anchor='ra')
+    d.text((W - 16, 18), WATERMARK_60 if len(files) > 300 else WATERMARK,
+           font=f_wm, fill=(255, 255, 255, 170), anchor='ra')
     out = Image.alpha_composite(im.convert('RGBA'), ov).convert('RGB')
     out.save(os.path.join(COMP, fn))
     if i % 60 == 0:
