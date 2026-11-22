@@ -485,16 +485,106 @@ bpy.ops.mesh.primitive_plane_add(size=0.55, location=(-1.35, -3.5, 2.02),
 icon = bpy.context.object; icon.name = 'icon_bubble'
 icon.data.materials.append(icon_mat)
 
-# bob idle karakter: semua part naik-turun bareng (keyframe dari posisi dasar)
-for parts, phase in ((charA, 0.0), (charB, 1.7)):
-    bases = [o.location.z for o in parts]
-    for f in range(1, 242, 16):
+# ============================================================
+# ANIMASI KARAKTER (PR #2) — bob idle + akting per karakter.
+# Semua keyframe ditulis dari posisi/rotasi dasar tiap part, jadi
+# bob dan gerakan kepala/lengan berbagi fcurve location yang sama.
+# ============================================================
+from mathutils import Matrix, Vector
+
+def _track(keys):
+    """Interpolasi halus (smoothstep) antar (frame, nilai)."""
+    def at(f):
+        if f <= keys[0][0]: return keys[0][1]
+        for (f0, v0), (f1, v1) in zip(keys, keys[1:]):
+            if f <= f1:
+                t = (f - f0) / max(1, f1 - f0)
+                t = t * t * (3 - 2 * t)
+                return v0 + (v1 - v0) * t
+        return keys[-1][1]
+    return at
+
+def _group(prefix, subs, exclude=()):
+    return [o for o in bpy.data.objects
+            if o.name.startswith(prefix)
+            and any(s in o.name for s in subs)
+            and not any(e in o.name for e in exclude)]
+
+def _pivot_pose(base_loc, base_euler, pivot, R):
+    loc = pivot + R @ (base_loc - pivot)
+    rot = (R.to_3x3() @ base_euler.to_matrix()).to_euler()
+    return loc, rot
+
+def animate_char(parts, prefix, loc, phase, head_pitch, head_yaw,
+                 pitch_axis, phone_arm=False, tap_shoe=False):
+    head = _group(prefix, ('_head', '_eye', '_mouth', '_hair', '_hijab'))
+    phone = _group(prefix, ('_armR', '_handR', '_phone')) if phone_arm else []
+    shoe = _group(prefix, ('_shoe',))
+    shoe_r = shoe[1] if (tap_shoe and len(shoe) > 1) else None
+    pivot = Vector((loc[0], loc[1], 0.98))
+    spivot = Vector((loc[0] + 0.30, loc[1] - 0.02, 0.90))
+    base = {o.name: (o.location.copy(), o.rotation_euler.copy()) for o in parts}
+    for f in range(1, 242, 4):
         dz = 0.022 * math.sin(2 * math.pi * f / 52 + phase)
-        for o, b in zip(parts, bases):
-            o.location.z = b + dz
+        p = head_pitch(f)
+        if phone_arm and p > 8:  # angguk kecil pas scroll HP
+            p += 3.5 * math.sin(2 * math.pi * f / 18)
+        R = (Matrix.Rotation(math.radians(head_yaw(f)), 4, 'Z')
+             @ Matrix.Rotation(math.radians(p), 4, pitch_axis))
+        Ra = Matrix.Rotation(math.radians((19 - head_pitch(f)) * 1.1), 4, pitch_axis)
+        for o in parts:
+            bl, be = base[o.name]
+            nl, nr = bl, be
+            if o in head:
+                nl, nr = _pivot_pose(bl, be, pivot, R)
+            elif o in phone:
+                nl, nr = _pivot_pose(bl, be, spivot, Ra)
+            o.location = (nl.x, nl.y, nl.z + dz)
             o.keyframe_insert('location', frame=f)
-    for o, b in zip(parts, bases):
-        o.location.z = b
+            if o in head or o in phone:
+                o.rotation_euler = nr
+                o.keyframe_insert('rotation_euler', frame=f)
+            if shoe_r is not None and o is shoe_r:
+                tap = 0.0
+                if 96 <= f <= 144:
+                    tap = math.radians(11) * max(0.0, math.sin(2 * math.pi * f / 9))
+                o.rotation_euler = (be.x + tap, be.y, be.z)
+                o.keyframe_insert('rotation_euler', frame=f)
+    for o in parts:
+        bl, be = base[o.name]
+        o.location = bl; o.rotation_euler = be
+
+# wargaA: cek HP (nunduk) -> angkat kepala + geleng frustrasi -> nunduk lagi
+pitchA = _track([(1, 17), (50, 22), (62, 0), (86, 0), (100, 20), (140, 23),
+                 (152, 0), (172, 0), (186, 19), (240, 19)])
+yawA = _track([(1, 0), (62, 0), (66, -16), (70, 16), (74, -16), (78, 12),
+               (82, 0), (152, 0), (156, -13), (160, 13), (164, -9), (168, 0), (240, 0)])
+animate_char(charA, 'wargaA', (-1.35, -3.4, 0), 0.0, pitchA, yawA, 'X',
+             phone_arm=True, tap_shoe=True)
+
+# wargaB (ibu warung): noleh sepanjang jalan pelan + satu anggukan menyapa
+pitchB = _track([(1, 5), (100, 5), (112, 17), (124, 5), (240, 5)])
+yawB = _track([(1, 0), (40, -20), (80, -20), (110, 16), (150, 16),
+               (185, -12), (240, -12)])
+animate_char(charB, 'wargaB', (3.25, 0.9, 0), 1.7, pitchB, yawB, 'Y')
+
+# lengan kanan ibu warung: gerakan mengelap/melayani (rotasi saja)
+armB = bpy.data.objects.get('wargaB_arm.001')
+if armB is not None:
+    be = armB.rotation_euler.copy()
+    for f in range(1, 242, 4):
+        armB.rotation_euler = (be.x, be.y + 0.48 * math.sin(2 * math.pi * f / 30), be.z)
+        armB.keyframe_insert('rotation_euler', frame=f)
+    armB.rotation_euler = be
+
+# ekor kucing kibas pelan
+tail = bpy.data.objects.get('cat_tail')
+if tail is not None:
+    be = tail.rotation_euler.copy()
+    for f in range(1, 242, 6):
+        tail.rotation_euler = (be.x, be.y, be.z + 0.48 * math.sin(2 * math.pi * f / 36))
+        tail.keyframe_insert('rotation_euler', frame=f)
+    tail.rotation_euler = be
 
 # ikon ikut bob wargaA
 for f in range(1, 242, 16):
