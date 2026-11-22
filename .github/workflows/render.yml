@@ -82,11 +82,15 @@ jobs:
         run: |
           cd scene
           blender -b -P scene.py -- anim ${{ matrix.start }} ${{ matrix.end }}
-          ls frames | wc -l
+          expected=$(( ${{ matrix.end }} - ${{ matrix.start }} + 1 ))
+          got=$(ls frames/*.png | wc -l)
+          echo "frame: $got dari $expected"
+          test "$got" -eq "$expected"
       - uses: actions/upload-artifact@v4
         with:
           name: frames-${{ matrix.start }}-${{ matrix.end }}
           path: scene/frames/*.png
+          if-no-files-found: error
           retention-days: 7
 
   assemble:
