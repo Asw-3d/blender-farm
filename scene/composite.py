@@ -11,8 +11,7 @@ os.makedirs(COMP, exist_ok=True)
 BOLD = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 
 PILL_TEXT = '1 ROUTER · 30 HP'
-CAPTIONS = [(1, 78, 'satu kampung,'), (79, 158, 'rebutan satu router'),
-            (159, 240, 'emang bisa?')]
+CAPTIONS = []  # PR #6: caption baris dimatikan — diganti caption kata karaoke + narasi di pasca-produksi
 WATERMARK = 'BUKTI MESIN BLENDER · 01'
 
 def caption_for(f):
