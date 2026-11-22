@@ -81,8 +81,17 @@ jobs:
           RENDER_PCT: ${{ needs.setup.outputs.pct }}
         run: |
           cd scene
-          blender -b -P scene.py -- anim ${{ matrix.start }} ${{ matrix.end }}
-          expected=$(( ${{ matrix.end }} - ${{ matrix.start }} + 1 ))
+          # Blender di llvmpipe kadang segfault di tengah chunk — render dilanjutkan
+          # otomatis dari frame pertama yang belum jadi (maks 4 percobaan).
+          start=${{ matrix.start }}; end=${{ matrix.end }}
+          for attempt in 1 2 3 4; do
+            next=$start
+            while [ $next -le $end ] && [ -f "frames/f$(printf %04d $next).png" ]; do next=$((next+1)); done
+            if [ $next -gt $end ]; then break; fi
+            echo "percobaan $attempt: render frame $next-$end"
+            blender -b -P scene.py -- anim $next $end || true
+          done
+          expected=$(( end - start + 1 ))
           got=$(ls frames/*.png | wc -l)
           echo "frame: $got dari $expected"
           test "$got" -eq "$expected"
