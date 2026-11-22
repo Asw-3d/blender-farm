@@ -58,8 +58,8 @@ sun.rotation_euler = (math.radians(48), math.radians(12), math.radians(-32))
 _set(sun_data, 'shadow_cascade_max_distance', 60)
 
 fill_data = bpy.data.lights.new('fill', 'SUN')
-fill_data.energy = 0.38
-fill_data.color = (0.72, 0.84, 1.0)  # isi dingin: bayangan agak biru
+fill_data.energy = 0.34
+fill_data.color = (0.82, 0.89, 1.0)  # isi dingin lembut: bayangan agak biru, jangan elektrik
 fill = bpy.data.objects.new('fill', fill_data)
 scene.collection.objects.link(fill)
 fill.rotation_euler = (math.radians(60), 0, math.radians(140))
@@ -250,7 +250,7 @@ M = {
     'window': mat('window', (0.13, 0.20, 0.30), 0.25),
     'wall_w': mat_grain('wall_w', (0.97, 0.94, 0.88), (0.93, 0.89, 0.82), 7, 0.35, 0.10),
     'wall_c': mat('wall_c', (0.97, 0.85, 0.62)),
-    'wall_b': mat('wall_b', (0.64, 0.79, 0.95)),
+    'wall_b': mat('wall_b', (0.58, 0.74, 0.93)),
     'roof':   mat_tiles('roof', (0.76, 0.27, 0.09), (0.62, 0.20, 0.07)),
     'wood':   mat_wood('wood', (0.34, 0.21, 0.11), (0.52, 0.36, 0.20)),
     'wood_l': mat_wood('wood_l', (0.52, 0.36, 0.19), (0.70, 0.52, 0.31)),
@@ -263,7 +263,9 @@ M = {
     'green1': mat('green1', (0.22, 0.72, 0.18)),
     'green2': mat('green2', (0.14, 0.58, 0.15)),
     'skin':   mat('skin', (0.96, 0.78, 0.60), 0.65),
-    'shirt_t': mat('shirt_t', (0.05, 0.72, 0.62)),
+    'skin2':  mat('skin2', (0.87, 0.62, 0.42), 0.65),
+    'drop':   mat('drop', (0.45, 0.75, 1.0), 0.25),
+    'shirt_t': mat('shirt_t', (0.86, 0.22, 0.02)),
     'shirt_r': mat('shirt_r', (0.92, 0.26, 0.20)),
     'hijab':  mat('hijab', (0.98, 0.80, 0.16)),
     'pants':  mat('pants', (0.16, 0.20, 0.30)),
@@ -425,6 +427,19 @@ for i in range(len(POLES) - 2):
 cable('drop1', (3.0, -3.2, 5.2), (5.2, 1.5, 3.4), sag=0.4)   # drop ke rumah kanan
 cable('drop2', (-3.1, 2.5, 5.2), (-5.0, 3.5, 3.6), sag=0.4)  # drop ke rumah kiri
 
+# barisan pohon horizon + tepi jalan: memecah strip hijau datar di kejauhan
+for _i, _tx in enumerate((-22, -16.5, -11, -6, 3.5, 8.5, 17, 23)):
+    _ty = 27.5 + (_i % 3) * 2.2
+    _s = 0.85 + (_i % 4) * 0.16
+    cyl(f'treeT{_i}', (_tx, _ty, 0.8 * _s), 0.14 * _s, 1.6 * _s, M['wood'])
+    sph(f'treeC{_i}', (_tx, _ty, 2.35 * _s), 1.05 * _s,
+        M['green1'] if _i % 2 else M['green2'])
+    sph(f'treeC{_i}b', (_tx + 0.7 * _s, _ty, 1.9 * _s), 0.7 * _s,
+        M['green2'] if _i % 2 else M['green1'])
+cyl('treeS1', (-4.55, 7.5, 0.75), 0.13, 1.5, M['wood'])
+sph('treeS1c', (-4.55, 7.5, 2.15), 0.95, M['green1'])
+sph('treeS1d', (-3.95, 7.5, 1.8), 0.62, M['green2'])
+
 # masjid jauh (siluet kampung)
 box('mosq', (10.5, 30, 2.2), (6.5, 6.5, 4.4), M['white'])
 sph('dome', (10.5, 30, 5.1), 2.3, M['teal'], scale=(1, 1, 0.75))
@@ -533,7 +548,10 @@ for ri, (r, ring_mat) in enumerate(rings):
 # ============================================================
 # KARAKTER CHIBI — menghadap -Y (ke kamera), offset diputar rot_z
 # ============================================================
-def chibi(name, loc, shirt, pants_c, rot_z=0.0, hijab_c=None, hair=True, phone=False):
+def chibi(name, loc, shirt, pants_c, rot_z=0.0, hijab_c=None, hair=True, phone=False,
+          skin_c=None, sweat=False):
+    if skin_c is None:
+        skin_c = M['skin']
     cz, sz = math.cos(rot_z), math.sin(rot_z)
     def off(lx, ly):
         return (loc[0] + lx * cz - ly * sz, loc[1] + lx * sz + ly * cz)
@@ -545,7 +563,11 @@ def chibi(name, loc, shirt, pants_c, rot_z=0.0, hijab_c=None, hair=True, phone=F
         x, y = off(0.095 * s_, -0.03)
         reg(box(f'{name}_shoe', (x, y, 0.045), (0.13, 0.23, 0.09), M['black'], bevel=0.03))
     reg(box(f'{name}_body', (loc[0], loc[1], 0.63), (0.52, 0.34, 0.56), shirt, bevel=0.10))
-    reg(cyl(f'{name}_neck', (loc[0], loc[1], 0.94), 0.07, 0.14, M['skin']))
+    # aksen baju: kerah putih + saku celana-warna (identitas karakter, anti balok polos)
+    reg(box(f'{name}_collar', (loc[0], loc[1], 0.90), (0.40, 0.36, 0.08), M['white'], bevel=0.03))
+    _pkx, _pky = off(0.11, -0.176)
+    reg(box(f'{name}_pocket', (_pkx, _pky, 0.68), (0.13, 0.02, 0.12), pants_c, bevel=0.008, rot=(0, 0, rot_z)))
+    reg(cyl(f'{name}_neck', (loc[0], loc[1], 0.94), 0.07, 0.14, skin_c))
     # lengan (bola lonjong) + tangan
     for s_ in (-1, 1):
         if phone and s_ > 0:
@@ -553,7 +575,7 @@ def chibi(name, loc, shirt, pants_c, rot_z=0.0, hijab_c=None, hair=True, phone=F
             a = reg(sph(f'{name}_armR', (x, y, 0.80), 0.155, shirt, scale=(0.36, 0.36, 1.05)))
             a.rotation_euler = (math.radians(-38), 0, 0)
             x, y = off(0.31, -0.26)
-            reg(sph(f'{name}_handR', (x, y, 0.94), 0.052, M['skin']))
+            reg(sph(f'{name}_handR', (x, y, 0.94), 0.052, skin_c))
             x, y = off(0.31, -0.285)
             ph = reg(box(f'{name}_phone', (x, y, 1.0), (0.10, 0.02, 0.18), M['black'], bevel=0.008))
             ph.rotation_euler = (math.radians(-18), 0, 0)
@@ -561,20 +583,50 @@ def chibi(name, loc, shirt, pants_c, rot_z=0.0, hijab_c=None, hair=True, phone=F
             x, y = off(0.315 * s_, 0)
             reg(sph(f'{name}_arm', (x, y, 0.60), 0.155, shirt, scale=(0.36, 0.36, 1.1)))
             x, y = off(0.315 * s_, -0.01)
-            reg(sph(f'{name}_hand', (x, y, 0.40), 0.052, M['skin']))
+            reg(sph(f'{name}_hand', (x, y, 0.40), 0.052, skin_c))
     # kepala + wajah
-    reg(sph(f'{name}_head', (loc[0], loc[1], 1.14), 0.26, M['skin']))
+    reg(sph(f'{name}_head', (loc[0], loc[1], 1.14), 0.26, skin_c))
     fx, fy = off(0, -0.238)
     for s_ in (-1, 1):
         x, y = off(0.095 * s_, -0.228)
         reg(sph(f'{name}_eye', (x, y, 1.185), 0.027, M['black'], scale=(1, 0.5, 1.35)))
-    # mulut: torus separuh masuk kepala -> busur yang nongol = ekspresi
+    # alis: balok tipis di atas mata (digerakkan animate_char per emosi)
+    for s_ in (-1, 1):
+        x, y = off(0.098 * s_, -0.250)
+        reg(box(f'{name}_brow' + ('P' if s_ > 0 else 'M'), (x, y, 1.258),
+                (0.088, 0.02, 0.022), M['black'], bevel=0.007, rot=(0, 0, rot_z)))
+    # mulut: 4 varian, yang tampil diatur skala oleh animate_char.
+    # senyum: torus separuh masuk kepala -> busur bawah yang nongol
     bpy.ops.mesh.primitive_torus_add(major_radius=0.042, minor_radius=0.009,
                                      major_segments=20, minor_segments=6,
                                      location=(fx, fy, 1.078),
                                      rotation=(math.radians(90), 0, rot_z))
-    mo = bpy.context.object; mo.name = f'{name}_mouth'
+    mo = bpy.context.object; mo.name = f'{name}_mouthS'
     mo.data.materials.append(M['black']); parts.append(mo)
+    # cemberut: torus sama tapi separuh bawah ring dibuang -> busur atas (n)
+    _fx2, _fy2 = off(0, -0.266)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.042, minor_radius=0.009,
+                                     major_segments=20, minor_segments=6,
+                                     location=(_fx2, _fy2, 1.082),
+                                     rotation=(math.radians(90), 0, rot_z))
+    fw = bpy.context.object; fw.name = f'{name}_mouthW'
+    fw.data.materials.append(M['black']); parts.append(fw)
+    import bmesh as _bm
+    _b = _bm.new(); _b.from_mesh(fw.data)
+    _kill = [fc for fc in _b.faces
+             if sum(v.co.y for v in fc.verts) / len(fc.verts) < 0]
+    _bm.ops.delete(_b, geom=_kill, context='FACES')
+    _b.to_mesh(fw.data); _b.free()
+    # mulut nganga (oval hitam) + mulut datar (garis)
+    _ox, _oy = off(0, -0.250)
+    reg(sph(f'{name}_mouthO', (_ox, _oy, 1.062), 0.024, M['black'], scale=(1, 0.4, 1.3)))
+    _lx, _ly = off(0, -0.252)
+    reg(box(f'{name}_mouthF', (_lx, _ly, 1.075), (0.052, 0.016, 0.014),
+            M['black'], bevel=0.005, rot=(0, 0, rot_z)))
+    # tetes keringat di sisi kepala (muncul saat frustrasi, diatur animate_char)
+    if sweat:
+        x, y = off(0.265, -0.14)
+        reg(sph(f'{name}_sweat', (x, y, 1.33), 0.030, M['drop'], scale=(0.72, 0.72, 1.3)))
     if hijab_c is not None:
         x, y = off(0, 0.045)
         reg(sph(f'{name}_hijab', (x, y, 1.17), 0.285, hijab_c, scale=(1, 1, 1.02)))
@@ -589,7 +641,8 @@ def chibi(name, loc, shirt, pants_c, rot_z=0.0, hijab_c=None, hair=True, phone=F
         reg(sph(f'{name}_hair', (x, y, 1.205), 0.263, M['black'], scale=(1, 1, 0.80)))
     return parts
 
-charA = chibi('wargaA', (-1.35, -3.4, 0), M['shirt_t'], M['pants'], phone=True)
+charA = chibi('wargaA', (-1.35, -3.4, 0), M['shirt_t'], M['pants'], phone=True,
+              skin_c=M['skin2'], sweat=True)
 charB = chibi('wargaB', (3.25, 0.9, 0), M['shirt_r'], M['pants'], rot_z=math.radians(-90), hijab_c=M['hijab'], hair=False)
 
 # gelembung ikon no-signal di atas wargaA (bidang bertekstur, menghadap -Y)
@@ -629,15 +682,29 @@ def _pivot_pose(base_loc, base_euler, pivot, R):
     rot = (R.to_3x3() @ base_euler.to_matrix()).to_euler()
     return loc, rot
 
+def _expr_at(expr, f):
+    """Segmen ekspresi di frame f: (huruf mulut, mode alis, keringat, f0, f1)."""
+    if expr:
+        for f0, f1, mouth, brow, sweat in expr:
+            if f0 <= f <= f1:
+                return mouth, brow, sweat, f0, f1
+    return 'S', 'normal', False, 1, 240
+
+
 def animate_char(parts, prefix, loc, phase, head_pitch, head_yaw,
-                 pitch_axis, phone_arm=False, tap_shoe=False):
-    head = _group(prefix, ('_head', '_eye', '_mouth', '_hair', '_hijab'))
+                 pitch_axis, phone_arm=False, tap_shoe=False,
+                 expr=None, blinks=()):
+    head = _group(prefix, ('_head', '_eye', '_mouth', '_hair', '_hijab',
+                           '_brow', '_sweat'))
     phone = _group(prefix, ('_armR', '_handR', '_phone')) if phone_arm else []
     shoe = _group(prefix, ('_shoe',))
     shoe_r = shoe[1] if (tap_shoe and len(shoe) > 1) else None
     pivot = Vector((loc[0], loc[1], 0.98))
     spivot = Vector((loc[0] + 0.30, loc[1] - 0.02, 0.90))
-    base = {o.name: (o.location.copy(), o.rotation_euler.copy()) for o in parts}
+    base = {o.name: (o.location.copy(), o.rotation_euler.copy(), o.scale.copy())
+            for o in parts}
+    _brow_tilt = {'normal': 0.0, 'angry': -0.34, 'sad': 0.26, 'up': 0.0}
+    _brow_lift = {'normal': 0.0, 'angry': -0.012, 'sad': 0.002, 'up': 0.020}
     for f in range(1, 242, 4):
         dz = 0.022 * math.sin(2 * math.pi * f / 52 + phase)
         p = head_pitch(f)
@@ -646,11 +713,30 @@ def animate_char(parts, prefix, loc, phase, head_pitch, head_yaw,
         R = (Matrix.Rotation(math.radians(head_yaw(f)), 4, 'Z')
              @ Matrix.Rotation(math.radians(p), 4, pitch_axis))
         Ra = Matrix.Rotation(math.radians((19 - head_pitch(f)) * 1.1), 4, pitch_axis)
+        mouth, brow_mode, sweat_on, sf0, sf1 = _expr_at(expr, f)
+        blink = 0.12 if any(abs(f - b) <= 2 for b in blinks) else 1.0
+        if sweat_on:
+            sw_k = max(0.0, min(1.0, (f - sf0) / 5.0, (sf1 - f) / 5.0 + 0.25))
+            sw_slide = (f - sf0) / max(1, sf1 - sf0)
+        else:
+            sw_k, sw_slide = 0.0, 0.0
         for o in parts:
-            bl, be = base[o.name]
+            bl, be, bs = base[o.name]
             nl, nr = bl, be
             if o in head:
                 nl, nr = _pivot_pose(bl, be, pivot, R)
+                if '_brow' in o.name:
+                    side = 1.0 if o.name.endswith('browP') else -1.0
+                    from mathutils import Euler as _Eul
+                    e = _Eul(nr)
+                    if pitch_axis == 'X':
+                        e.y += _brow_tilt[brow_mode] * side
+                    else:
+                        e.x += _brow_tilt[brow_mode] * side
+                    nr = e
+                    nl = Vector((nl.x, nl.y, nl.z + _brow_lift[brow_mode]))
+                if '_sweat' in o.name:
+                    nl = Vector((nl.x, nl.y, nl.z - 0.055 * sw_slide))
             elif o in phone:
                 nl, nr = _pivot_pose(bl, be, spivot, Ra)
             o.location = (nl.x, nl.y, nl.z + dz)
@@ -658,6 +744,16 @@ def animate_char(parts, prefix, loc, phase, head_pitch, head_yaw,
             if o in head or o in phone:
                 o.rotation_euler = nr
                 o.keyframe_insert('rotation_euler', frame=f)
+            if '_mouth' in o.name:
+                k = 1.0 if o.name.endswith('mouth' + mouth) else 0.001
+                o.scale = (bs.x * k, bs.y * k, bs.z * k)
+                o.keyframe_insert('scale', frame=f)
+            elif '_eye' in o.name:
+                o.scale = (bs.x, bs.y, bs.z * blink)
+                o.keyframe_insert('scale', frame=f)
+            elif '_sweat' in o.name:
+                o.scale = (bs.x * sw_k, bs.y * sw_k, bs.z * sw_k)
+                o.keyframe_insert('scale', frame=f)
             if shoe_r is not None and o is shoe_r:
                 tap = 0.0
                 if 96 <= f <= 144:
@@ -665,22 +761,29 @@ def animate_char(parts, prefix, loc, phase, head_pitch, head_yaw,
                 o.rotation_euler = (be.x + tap, be.y, be.z)
                 o.keyframe_insert('rotation_euler', frame=f)
     for o in parts:
-        bl, be = base[o.name]
-        o.location = bl; o.rotation_euler = be
+        bl, be, bs = base[o.name]
+        o.location = bl; o.rotation_euler = be; o.scale = bs
 
 # wargaA: cek HP (nunduk) -> angkat kepala + geleng frustrasi -> nunduk lagi
 pitchA = _track([(1, 17), (50, 22), (62, 0), (86, 0), (100, 20), (140, 23),
                  (152, 0), (172, 0), (186, 19), (240, 19)])
 yawA = _track([(1, 0), (62, 0), (66, -16), (70, 16), (74, -16), (78, 12),
                (82, 0), (152, 0), (156, -13), (160, 13), (164, -9), (168, 0), (240, 0)])
+exprA = [(1, 61, 'S', 'normal', False), (62, 90, 'W', 'angry', True),
+         (91, 151, 'S', 'normal', False), (152, 176, 'W', 'angry', True),
+         (177, 240, 'O', 'up', False)]
 animate_char(charA, 'wargaA', (-1.35, -3.4, 0), 0.0, pitchA, yawA, 'X',
-             phone_arm=True, tap_shoe=True)
+             phone_arm=True, tap_shoe=True, expr=exprA,
+             blinks=(34, 88, 141, 196, 228))
 
 # wargaB (ibu warung): noleh sepanjang jalan pelan + satu anggukan menyapa
 pitchB = _track([(1, 5), (100, 5), (112, 17), (124, 5), (240, 5)])
 yawB = _track([(1, 0), (40, -20), (80, -20), (110, 16), (150, 16),
                (185, -12), (240, -12)])
-animate_char(charB, 'wargaB', (3.25, 0.9, 0), 1.7, pitchB, yawB, 'Y')
+exprB = [(1, 104, 'S', 'normal', False), (105, 128, 'O', 'up', False),
+         (129, 240, 'S', 'normal', False)]
+animate_char(charB, 'wargaB', (3.25, 0.9, 0), 1.7, pitchB, yawB, 'Y',
+             expr=exprB, blinks=(52, 118, 176, 214))
 
 # lengan kanan ibu warung: gerakan mengelap/melayani (rotasi saja)
 armB = bpy.data.objects.get('wargaB_arm.001')
