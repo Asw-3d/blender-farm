@@ -117,6 +117,112 @@ def mat_brick(name, c1, c2, scale=3.0):
     bsdf.inputs['Roughness'].default_value = 0.9
     return m
 
+def mat_tiles(name, c1, c2, scale=3.0):
+    """Genteng berbaris: pola bata rapat dibaca sebagai baris genteng."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes['Principled BSDF']
+    coord = nt.nodes.new('ShaderNodeTexCoord')
+    mapping = nt.nodes.new('ShaderNodeMapping')
+    # Rotasi 90°: bubungan atap prisma berjalan searah Y, jadi baris pola bata
+    # harus ditumpuk sepanjang X (menuruni lereng), bukan sepanjang Y.
+    mapping.inputs['Rotation'].default_value = (0, 0, math.radians(90))
+    mapping.inputs['Scale'].default_value = (scale * 0.9, scale * 0.45, scale * 0.45)
+    brick = nt.nodes.new('ShaderNodeTexBrick')
+    brick.inputs['Color1'].default_value = (*c1, 1)
+    brick.inputs['Color2'].default_value = (*c2, 1)
+    brick.inputs['Mortar'].default_value = (0.30, 0.16, 0.11, 1)
+    brick.inputs['Scale'].default_value = 1.6
+    brick.inputs['Mortar Size'].default_value = 0.03
+    brick.inputs['Brick Width'].default_value = 0.55
+    brick.inputs['Row Height'].default_value = 0.14
+    try:
+        brick.offset = 0.5; brick.offset_frequency = 1
+    except Exception:
+        pass
+    if 'Offset' in brick.inputs:
+        brick.inputs['Offset'].default_value = 0.5
+    noise = nt.nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value = 6.0
+    bump = nt.nodes.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = 0.35
+    bump.inputs['Distance'].default_value = 0.25
+    nt.links.new(coord.outputs['Generated'], mapping.inputs['Vector'])
+    nt.links.new(mapping.outputs['Vector'], brick.inputs['Vector'])
+    nt.links.new(brick.outputs['Color'], bsdf.inputs['Base Color'])
+    nt.links.new(noise.outputs['Fac'], bump.inputs['Height'])
+    nt.links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
+    bsdf.inputs['Roughness'].default_value = 0.92
+    return m
+
+def mat_wood(name, c1, c2, scale=1.4, rough=0.85):
+    """Kayu berurat: gelombang pita diacak noise -> garis serat memanjang."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes['Principled BSDF']
+    coord = nt.nodes.new('ShaderNodeTexCoord')
+    mapping = nt.nodes.new('ShaderNodeMapping')
+    mapping.inputs['Scale'].default_value = (scale, scale, scale)
+    wave = nt.nodes.new('ShaderNodeTexWave')
+    wave.wave_type = 'BANDS'; wave.bands_direction = 'Z'
+    wave.inputs['Scale'].default_value = 4.5
+    wave.inputs['Distortion'].default_value = 3.5
+    wave.inputs['Detail'].default_value = 3.0
+    ramp = nt.nodes.new('ShaderNodeValToRGB')
+    ramp.color_ramp.elements[0].color = (*c1, 1)
+    ramp.color_ramp.elements[1].color = (*c2, 1)
+    noise = nt.nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value = 5.0
+    bump = nt.nodes.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = 0.22
+    bump.inputs['Distance'].default_value = 0.2
+    nt.links.new(coord.outputs['Generated'], mapping.inputs['Vector'])
+    nt.links.new(mapping.outputs['Vector'], wave.inputs['Vector'])
+    nt.links.new(wave.outputs['Color'], ramp.inputs['Fac'])
+    nt.links.new(ramp.outputs['Color'], bsdf.inputs['Base Color'])
+    nt.links.new(noise.outputs['Fac'], bump.inputs['Height'])
+    nt.links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
+    bsdf.inputs['Roughness'].default_value = rough
+    return m
+
+def mat_grain(name, c1, c2, scale=9.0, mix=0.3, bump_s=0.25, patches=None,
+              map_scale=(1, 1, 1)):
+    """Noise warna + bump butiran. map_scale mengkompensasi bidang panjang
+    (koordinat Generated ternormalisasi -> tanpa ini tekstur melar searah sumbu panjang)."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes['Principled BSDF']
+    coord = nt.nodes.new('ShaderNodeTexCoord')
+    mapping = nt.nodes.new('ShaderNodeMapping')
+    mapping.inputs['Scale'].default_value = map_scale
+    nt.links.new(coord.outputs['Generated'], mapping.inputs['Vector'])
+    tex = nt.nodes.new('ShaderNodeTexNoise'); tex.inputs['Scale'].default_value = scale
+    ramp = nt.nodes.new('ShaderNodeValToRGB')
+    ramp.color_ramp.elements[0].color = (*c1, 1)
+    ramp.color_ramp.elements[1].color = (*c2, 1)
+    mixn = nt.nodes.new('ShaderNodeMixRGB'); mixn.blend_type = 'MIX'
+    mixn.inputs[0].default_value = mix
+    mixn.inputs[1].default_value = (*c1, 1)
+    nt.links.new(mapping.outputs['Vector'], tex.inputs['Vector'])
+    nt.links.new(tex.outputs['Fac'], ramp.inputs['Fac'])
+    nt.links.new(ramp.outputs['Color'], mixn.inputs[2])
+    out = mixn.outputs['Color']
+    if patches is not None:
+        pn = nt.nodes.new('ShaderNodeTexNoise'); pn.inputs['Scale'].default_value = patches[1]
+        pm = nt.nodes.new('ShaderNodeMixRGB'); pm.blend_type = 'MIX'
+        pm.inputs[2].default_value = (*patches[0], 1)
+        nt.links.new(pn.outputs['Fac'], pm.inputs[0])
+        nt.links.new(out, pm.inputs[1])
+        out = pm.outputs['Color']
+    nt.links.new(out, bsdf.inputs['Base Color'])
+    bnoise = nt.nodes.new('ShaderNodeTexNoise'); bnoise.inputs['Scale'].default_value = scale * 5.0
+    bump = nt.nodes.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = bump_s
+    bump.inputs['Distance'].default_value = 0.15
+    nt.links.new(mapping.outputs['Vector'], bnoise.inputs['Vector'])
+    nt.links.new(bnoise.outputs['Fac'], bump.inputs['Height'])
+    nt.links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
+    bsdf.inputs['Roughness'].default_value = 0.95
+    return m
+
 def mat_image(name, path, alpha=False):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
@@ -133,20 +239,20 @@ def mat_image(name, path, alpha=False):
 
 # palet
 M = {
-    'road':   mat_noise('road', (0.58, 0.49, 0.37), (0.47, 0.39, 0.29), 9, 0.3),
-    'walk':   mat_noise('walk', (0.74, 0.67, 0.55), (0.63, 0.56, 0.45), 9, 0.25),
-    'grass':  mat('grass', (0.12, 0.56, 0.11)),
+    'road':   mat_grain('road', (0.58, 0.49, 0.37), (0.47, 0.39, 0.29), 6, 0.3, 0.18, map_scale=(1, 7.2, 1)),
+    'walk':   mat_grain('walk', (0.74, 0.67, 0.55), (0.63, 0.56, 0.45), 6, 0.25, 0.15, map_scale=(1, 35, 1)),
+    'grass':  mat_grain('grass', (0.12, 0.56, 0.11), (0.16, 0.62, 0.13), 8, 0.4, 0.15, patches=((0.30, 0.66, 0.16), 1.6)),
     'window': mat('window', (0.13, 0.20, 0.30), 0.25),
-    'wall_w': mat('wall_w', (0.97, 0.94, 0.88)),
+    'wall_w': mat_grain('wall_w', (0.97, 0.94, 0.88), (0.93, 0.89, 0.82), 7, 0.35, 0.10),
     'wall_c': mat('wall_c', (0.97, 0.85, 0.62)),
     'wall_b': mat('wall_b', (0.64, 0.79, 0.95)),
-    'roof':   mat_noise('roof', (0.74, 0.26, 0.09), (0.61, 0.20, 0.07), 5, 0.3, 0.92),
-    'wood':   mat('wood', (0.45, 0.30, 0.18)),
-    'wood_l': mat('wood_l', (0.62, 0.45, 0.28)),
+    'roof':   mat_tiles('roof', (0.76, 0.27, 0.09), (0.62, 0.20, 0.07)),
+    'wood':   mat_wood('wood', (0.34, 0.21, 0.11), (0.52, 0.36, 0.20)),
+    'wood_l': mat_wood('wood_l', (0.52, 0.36, 0.19), (0.70, 0.52, 0.31)),
     'pole':   mat('pole', (0.15, 0.13, 0.11), 0.9),
     'black':  mat('black', (0.05, 0.05, 0.06), 0.6),
     'white':  mat('white', (0.96, 0.96, 0.97), 0.5),
-    'teal':   mat('teal', (0.05, 0.55, 0.52)),
+    'teal':   mat_wood('teal', (0.03, 0.48, 0.45), (0.07, 0.62, 0.58), rough=0.7),
     'orange': mat('orange', (0.95, 0.36, 0.12)),
     'red':    mat('red', (0.88, 0.16, 0.14)),
     'green1': mat('green1', (0.22, 0.72, 0.18)),
@@ -159,7 +265,7 @@ M = {
     'cloud':  mat('cloud', (1, 1, 1), 1.0, emission=(1, 1, 1), e_strength=0.45),
     'led':    mat('led', (0.1, 0.9, 0.3), 0.4, emission=(0.1, 0.95, 0.3), e_strength=2.0),
     'glass':  mat('glass', (0.75, 0.88, 0.95), 0.12, alpha=0.35),
-    'roof2':  mat_noise('roof2', (0.38, 0.30, 0.26), (0.30, 0.23, 0.20), 5, 0.3, 0.95),
+    'roof2':  mat_tiles('roof2', (0.42, 0.34, 0.29), (0.33, 0.26, 0.22)),
     'cream':  mat('cream', (0.87, 0.80, 0.66), 0.95),
     'grey':   mat('grey', (0.45, 0.46, 0.48), 0.8),
     'terra':  mat('terra', (0.62, 0.30, 0.16), 0.9),
