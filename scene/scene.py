@@ -821,12 +821,28 @@ scene.camera = cam
 target = empty('cam_target', (0, 0, 1.1))
 con = cam.constraints.new('TRACK_TO')
 con.target = target; con.track_axis = 'TRACK_NEGATIVE_Z'; con.up_axis = 'UP_Y'
-cam.location = (0.0, -12.5, 2.6); cam.keyframe_insert('location', frame=1)
-target.location = (0, 0, 1.1); target.keyframe_insert('location', frame=1)
-cam.location = (0.1, -9.2, 2.05); cam.keyframe_insert('location', frame=120)
-target.location = (0.6, -2.8, 1.8); target.keyframe_insert('location', frame=120)
-cam.location = (0.55, -6.6, 1.65); cam.keyframe_insert('location', frame=240)
-target.location = (2.45, -2.95, 2.55); target.keyframe_insert('location', frame=240)
+# Bahasa kamera: 4 shot potongan keras (bukan satu dolly panjang).
+# Tiap shot = push-in pelan; potongan terjadi di antara keyframe f_akhir -> f_awal shot berikut.
+def _shot(f0, f1, c0, c1, t0, t1, lens):
+    cam.location = c0; cam.keyframe_insert('location', frame=f0)
+    target.location = t0; target.keyframe_insert('location', frame=f0)
+    cam.location = c1; cam.keyframe_insert('location', frame=f1)
+    target.location = t1; target.keyframe_insert('location', frame=f1)
+    try:
+        cam_data.lens = lens
+        cam_data.keyframe_insert('lens', frame=f0)
+        cam_data.keyframe_insert('lens', frame=f1)
+    except Exception:
+        pass
+
+_shot(1, 60, (-0.6, -14.5, 3.6), (-0.4, -13.0, 3.35),
+      (0, -2, 1.2), (0, -2.2, 1.2), 24)                       # 1: establishing wide gang
+_shot(61, 120, (-0.35, -7.4, 1.5), (-0.65, -6.8, 1.42),
+      (-1.3, -3.4, 1.12), (-1.32, -3.4, 1.1), 32)             # 2: medium wargaA (geleng f62-82)
+_shot(121, 180, (0.4, -6.4, 1.9), (0.7, -5.7, 1.8),
+      (3.9, -0.3, 1.2), (3.95, -0.25, 1.18), 30)              # 3: medium warung + wargaB + kucing
+_shot(181, 240, (0.15, -7.6, 1.85), (0.55, -6.6, 1.65),
+      (1.6, -3.1, 2.2), (2.45, -2.95, 2.55), 36)              # 4: close-up hero router
 # Interpolasi keyframe kamera: default Blender memang BEZIER, jadi blok ini
 # kosmetik — dibungkus try agar perbedaan API actions antar versi (4.0 vs 5.0)
 # tidak pernah menggagalkan render.
