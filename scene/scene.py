@@ -11,14 +11,20 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 
 # ---------- renderer: Eevee, bayangan lembut, AO ----------
+# Guard hasattr: API Eevee berubah antar versi (VM lokal 4.0, runner GitHub 5.0).
+def _set(obj, name, value):
+    if hasattr(obj, name):
+        setattr(obj, name, value)
+
 scene.render.engine = 'BLENDER_EEVEE'
-scene.eevee.taa_render_samples = 8
-scene.eevee.use_soft_shadows = True
-scene.eevee.shadow_cube_size = '1024'
-scene.eevee.shadow_cascade_size = '1024'
-scene.eevee.use_gtao = True
-scene.eevee.gtao_factor = 1.1
-scene.eevee.gtao_distance = 4.0
+_set(scene.eevee, 'taa_render_samples', 8)
+_set(scene.eevee, 'use_soft_shadows', True)  # <= 4.x
+_set(scene.eevee, 'use_shadows', True)       # 5.x
+_set(scene.eevee, 'shadow_cube_size', '1024')
+_set(scene.eevee, 'shadow_cascade_size', '1024')
+_set(scene.eevee, 'use_gtao', True)
+_set(scene.eevee, 'gtao_factor', 1.1)
+_set(scene.eevee, 'gtao_distance', 4.0)
 scene.render.resolution_x = 1080
 scene.render.resolution_y = 1920
 scene.render.resolution_percentage = 50  # iterasi cepat; final proof dinaikkan
@@ -40,7 +46,7 @@ sun_data.angle = math.radians(3.5)  # tepi bayangan lembut
 sun = bpy.data.objects.new('sun', sun_data)
 scene.collection.objects.link(sun)
 sun.rotation_euler = (math.radians(48), math.radians(12), math.radians(-32))
-sun_data.shadow_cascade_max_distance = 60
+_set(sun_data, 'shadow_cascade_max_distance', 60)
 
 fill_data = bpy.data.lights.new('fill', 'SUN')
 fill_data.energy = 0.3
