@@ -152,6 +152,11 @@ M = {
     'cloud':  mat('cloud', (1, 1, 1), 1.0, emission=(1, 1, 1), e_strength=0.25),
     'led':    mat('led', (0.1, 0.9, 0.3), 0.4, emission=(0.1, 0.95, 0.3), e_strength=2.0),
     'glass':  mat('glass', (0.75, 0.88, 0.95), 0.12, alpha=0.35),
+    'roof2':  mat_noise('roof2', (0.38, 0.30, 0.26), (0.30, 0.23, 0.20), 5, 0.3, 0.95),
+    'cream':  mat('cream', (0.87, 0.80, 0.66), 0.95),
+    'grey':   mat('grey', (0.45, 0.46, 0.48), 0.8),
+    'terra':  mat('terra', (0.62, 0.30, 0.16), 0.9),
+    'lamp':   mat('lamp', (1.0, 0.80, 0.45), 0.4, emission=(1.0, 0.72, 0.32), e_strength=1.6),
 }
 
 # ---------- bangun helpers ----------
@@ -236,21 +241,32 @@ plane('road', (0, 4, 0), (6.4, 46), M['road'])
 plane('walk_r', (3.85, 4, 0.012), (1.3, 46), M['walk'])
 plane('walk_l', (-3.85, 4, 0.012), (1.3, 46), M['walk'])
 
-def house(x, y, w, d, h, wall, flip=False):
+def house(x, y, w, d, h, wall, flip=False, roof_mat=None):
     g = empty(f'house_{x}_{y}', (x, y, 0))
-    b = box('wall', (x, y, h / 2), (w, d, h), wall)
-    r = prism_roof('roof', (x, y, h), w + 0.5, d + 0.5, h * 0.52, M['roof'])
+    # fondasi/skirting abu di kaki dinding (biar rumah terasa menapak)
+    box('found', (x, y, 0.16), (w + 0.10, d + 0.10, 0.32), M['grey'])
+    b = box('wall', (x, y, h / 2 + 0.1), (w, d, h), wall)
+    r = prism_roof('roof', (x, y, h + 0.1), w + 0.5, d + 0.5, h * 0.52, roof_mat or M['roof'])
+    # bubungan atap
+    box('ridge', (x, y, h + 0.1 + h * 0.52 + 0.03), (0.20, d + 0.56, 0.10), M['wood'])
     # pintu + jendela di sisi menghadap jalan
     face = 1 if x < 0 else -1
-    box('door', (x + face * (w / 2 + 0.01), y - d * 0.18, 0.85), (0.06, 0.8, 1.7), M['wood'])
-    box('win', (x + face * (w / 2 + 0.01), y + d * 0.22, 1.35), (0.06, 0.9, 0.9), M['window'])
+    fx = x + face * (w / 2 + 0.01)
+    box('door', (fx, y - d * 0.18, 0.95), (0.06, 0.8, 1.7), M['wood'])
+    box('step', (x + face * (w / 2 + 0.22), y - d * 0.18, 0.06), (0.46, 1.0, 0.12), M['walk'])
+    # jendela: kusen putih + kaca + palang silang
+    wy = y + d * 0.22
+    box('wframe', (fx, wy, 1.45), (0.05, 1.02, 1.02), M['white'])
+    box('win', (fx + face * 0.02, wy, 1.45), (0.06, 0.9, 0.9), M['window'])
+    box('wmull_v', (fx + face * 0.045, wy, 1.45), (0.03, 0.06, 0.9), M['white'])
+    box('wmull_h', (fx + face * 0.045, wy, 1.45), (0.03, 0.9, 0.06), M['white'])
     return g
 
 house(-5.6, -3.5, 3.6, 4.6, 3.0, M['wall_c'])
-house(-5.8, 3.5, 3.8, 5.0, 3.4, M['wall_w'])
+house(-5.8, 3.5, 3.8, 5.0, 3.4, M['wall_w'], roof_mat=M['roof2'])
 house(-5.6, 11.0, 3.6, 4.6, 3.0, M['wall_b'])
 house(5.9, 6.5, 3.8, 5.2, 3.3, M['wall_w'])
-house(5.7, 14.0, 3.6, 4.8, 3.0, M['wall_c'])
+house(5.7, 14.0, 3.6, 4.8, 3.0, mat_brick('brick1', (0.62, 0.30, 0.20), (0.52, 0.24, 0.16)), roof_mat=M['roof2'])
 house(-5.7, 18.5, 3.7, 4.8, 3.2, M['wall_w'])
 house(5.8, 21.0, 3.7, 4.8, 3.1, M['wall_b'])
 
@@ -408,6 +424,7 @@ def chibi(name, loc, shirt, pants_c, rot_z=0.0, hijab_c=None, hair=True, phone=F
         x, y = off(0.095 * s_, -0.03)
         reg(box(f'{name}_shoe', (x, y, 0.045), (0.13, 0.23, 0.09), M['black'], bevel=0.03))
     reg(box(f'{name}_body', (loc[0], loc[1], 0.63), (0.52, 0.34, 0.56), shirt, bevel=0.10))
+    reg(cyl(f'{name}_neck', (loc[0], loc[1], 0.94), 0.07, 0.14, M['skin']))
     # lengan (bola lonjong) + tangan
     for s_ in (-1, 1):
         if phone and s_ > 0:
@@ -477,6 +494,114 @@ for f in range(1, 242, 16):
     icon.location.z = 2.02 + 0.03 * math.sin(2 * math.pi * f / 52 + 0.0) + 0.02 * math.sin(2 * math.pi * f / 26)
     icon.keyframe_insert('location', frame=f)
 icon.location.z = 2.02
+
+# ============================================================
+# PR #1 — POLES MODEL & SET (semua statis, tanpa keyframe)
+# ============================================================
+# --- Warung: dinding belakang + rak + barang dagangan (interior terbaca) ---
+box('w_back', (6.04, WY, 1.52), (0.09, 2.5, 2.3), M['wood_l'])
+box('w_side', (5.55, WY - 1.28, 1.30), (1.05, 0.08, 1.9), M['wood_l'])
+for sz in (1.78, 2.24):
+    box('w_shelf', (5.82, WY, sz), (0.34, 2.2, 0.05), M['wood'])
+_goods = [(0.92, 0.30, 0.25), (0.25, 0.55, 0.90), (0.30, 0.75, 0.35), (0.95, 0.75, 0.20),
+          (0.95, 0.55, 0.15), (0.60, 0.35, 0.85), (0.15, 0.70, 0.65), (0.90, 0.45, 0.60)]
+_gm = [mat(f'good{i}', c, 0.55) for i, c in enumerate(_goods)]
+for k in range(9):  # toples & kaleng di dua rak
+    gx = 5.80 + (0.09 if k % 3 == 0 else -0.07)
+    gy = WY - 0.95 + (k % 5) * 0.44
+    gz = 1.78 if k < 5 else 2.24
+    if k % 3 == 0:
+        cyl(f'jar{k}', (gx, gy, gz + 0.10), 0.075, 0.20, M['glass'])
+        cyl(f'jarf{k}', (gx, gy, gz + 0.09), 0.062, 0.15, _gm[k % len(_gm)])
+    else:
+        cyl(f'can{k}', (gx, gy, gz + 0.07), 0.055, 0.14, _gm[k % len(_gm)])
+for k in range(4):  # botol di meja belakang counter
+    cyl(f'btl{k}', (5.55 - 0.12, WY - 0.75 + k * 0.5, 1.28), 0.05, 0.24, _gm[(k + 3) % len(_gm)])
+# --- Etalase kaca di atas counter: gorengan di dalamnya ---
+EX, EY, EZ = WX - 0.55, WY - 0.30, 1.16
+box('et_base', (EX, EY, EZ + 0.02), (0.74, 0.52, 0.04), M['wood'])
+box('et_top', (EX, EY, EZ + 0.46), (0.74, 0.52, 0.04), M['wood'])
+for sx in (-0.35, 0.35):
+    for sy in (-0.24, 0.24):
+        box('et_post', (EX + sx, EY + sy, EZ + 0.24), (0.04, 0.04, 0.44), M['wood'])
+box('et_glass', (EX, EY, EZ + 0.24), (0.68, 0.46, 0.40), M['glass'])
+box('et_tray', (EX, EY, EZ + 0.07), (0.60, 0.40, 0.03), M['grey'])
+for k in range(10):
+    sph(f'fry{k}', (EX - 0.22 + (k % 5) * 0.115, EY - 0.09 + (k // 5) * 0.18, EZ + 0.125),
+        0.058, _gm[4], scale=(1, 1, 0.75))
+# --- Lampu gantung warung + krat botol + karung + ember ---
+cyl('w_cord', (5.0, WY, 2.86), 0.012, 0.6, M['black'])
+bpy.ops.mesh.primitive_cone_add(vertices=20, radius1=0.16, radius2=0.05, depth=0.14,
+                                location=(5.0, WY, 2.52))
+bpy.context.object.data.materials.append(M['orange'])
+sph('w_bulb', (5.0, WY, 2.44), 0.055, M['lamp'])
+box('crate1', (6.0, WY + 1.52, 0.21), (0.56, 0.56, 0.42), M['red'], bevel=0.02)
+box('crate2', (6.0, WY + 1.52, 0.62), (0.56, 0.56, 0.40), _gm[1], bevel=0.02)
+for k in range(3):
+    cyl(f'cbtl{k}', (5.86 + (k % 2) * 0.24, WY + 1.40 + (k // 2) * 0.24, 0.94), 0.045, 0.24, _gm[(k + 1) % len(_gm)])
+sph('sack', (5.9, WY - 1.05, 0.26), 0.34, M['cream'], scale=(1, 1, 0.78))
+cyl('bucket', (5.35, WY - 1.35, 0.19), 0.17, 0.38, _gm[5])
+
+# --- Tiang hero: kotak sambungan + lilitan kabel + pita kuning ---
+box('pole_box', (2.94, -3.2, 2.15), (0.15, 0.36, 0.46), M['grey'], bevel=0.02)
+bpy.ops.mesh.primitive_torus_add(major_radius=0.115, minor_radius=0.022, major_segments=24,
+                                 minor_segments=8, location=(2.90, -3.48, 2.62),
+                                 rotation=(0, math.radians(90), 0))
+bpy.context.object.data.materials.append(M['black'])
+cyl('pole_band', (3.0, -3.2, 3.78), 0.098, 0.15, _gm[3])
+
+# --- Motor bebek parkir di trotoar kiri depan ---
+def motorbike(x, y, rot_z, body_mat):
+    cz, sz = math.cos(rot_z), math.sin(rot_z)
+    def off(lx, ly):
+        return (x + lx * cz - ly * sz, y + lx * sz + ly * cz)
+    for ly in (0.52, -0.52):  # roda depan/belakang
+        wx_, wy_ = off(0, ly)
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.24, minor_radius=0.065,
+                                         major_segments=24, minor_segments=10,
+                                         location=(wx_, wy_, 0.27),
+                                         rotation=(0, math.radians(90), rot_z))
+        bpy.context.object.data.materials.append(M['black'])
+        hx, hy = off(0, ly)
+        cyl('hub', (hx, hy, 0.27), 0.085, 0.06, M['grey'], rot=(0, math.radians(90), 0))
+    bx, by = off(0, -0.08)
+    box('mb_body', (bx, by, 0.44), (0.30, 0.80, 0.30), body_mat, bevel=0.07, rot=(0, 0, rot_z))
+    sx_, sy_ = off(0, -0.28)
+    box('mb_seat', (sx_, sy_, 0.63), (0.30, 0.52, 0.11), M['black'], bevel=0.04, rot=(0, 0, rot_z))
+    fx_, fy_ = off(0, 0.42)
+    box('mb_shield', (fx_, fy_, 0.55), (0.32, 0.07, 0.46), body_mat, bevel=0.03,
+        rot=(math.radians(-18), 0, rot_z))
+    hx, hy = off(0, 0.47)
+    cyl('mb_bar', (hx, hy, 0.82), 0.022, 0.44, M['black'], rot=(0, 0, math.radians(90) + rot_z))
+    lx_, ly_ = off(0, 0.50)
+    sph('mb_light', (lx_, ly_, 0.66), 0.055, M['lamp'])
+    kx, ky = off(-0.10, -0.05)
+    cyl('mb_stand', (kx, ky, 0.16), 0.018, 0.34, M['grey'], rot=(math.radians(25), math.radians(18), 0))
+
+motorbike(-2.7, 5.5, 0.35, M['red'])
+
+# --- Jemuran di celah antar rumah kiri (biar kelihatan kamera) ---
+cyl('laundry_p1', (-3.95, -1.15, 1.27), 0.035, 2.55, M['wood'])
+cyl('laundry_p2', (-3.95, 0.95, 1.27), 0.035, 2.55, M['wood'])
+cable('laundry_line', (-3.95, -1.15, 2.5), (-3.95, 0.95, 2.5), sag=0.08, r=0.012)
+for i, (cy, cm) in enumerate(((-0.62, M['red']), (-0.05, M['white']), (0.55, _gm[1]))):
+    box(f'cloth{i}', (-3.95, cy, 2.06), (0.05, 0.52, 0.78), cm, rot=(0, 0, 0.03 * (i - 1)))
+
+# --- Pot tanaman + semak di sepanjang pagar ---
+def pot(x, y):
+    bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.13, radius2=0.19, depth=0.30,
+                                    location=(x, y, 0.15))
+    bpy.context.object.data.materials.append(M['terra'])
+    sph('potleaf', (x, y, 0.48), 0.24, M['green2'], scale=(1, 1, 0.8))
+
+pot(4.30, -0.35); pot(4.30, 2.3); pot(-4.30, -2.6); pot(-4.30, 6.4); pot(4.30, 12.6)
+for bx, by in ((-4.25, 1.2), (4.25, 8.6), (-4.25, 13.8)):
+    sph('bush', (bx, by, 0.22), 0.34, M['green2'], scale=(1.15, 1, 0.65))
+
+# --- Marka jalan putus-putus (bagian dekat kamera, warna pudar) ---
+_dashm = mat('dash', (0.72, 0.70, 0.64), 0.95)
+for k in range(5):
+    box(f'dash{k}', (0, -9.5 + k * 2.3, 0.006), (0.14, 0.9, 0.012), _dashm)
 
 # ============================================================
 # KAMERA — dolly masuk gang, target geser ke router hero
