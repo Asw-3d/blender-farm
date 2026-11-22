@@ -1,0 +1,123 @@
+# Render farm Blender di GitHub Actions — chunk frame jalan PARALEL di banyak runner.
+# Dua cara memicu:
+#  1) Push yang mengubah render-request.json (jalur utama — Muse cukup push file itu).
+#  2) Manual: tab Actions -> "Render Blender (farm)" -> Run workflow (isi parameter di form).
+# Repo publik = menit gratis tanpa batas (runner CPU 4 vCPU, tanpa GPU -> Eevee via Mesa/llvmpipe).
+# Hasil akhir di-commit balik ke folder renders/ oleh job assemble.
+name: Render Blender (farm)
+
+on:
+  workflow_dispatch:
+    inputs:
+      frame_start:
+        description: "Frame awal"
+        default: "1"
+      frame_end:
+        description: "Frame akhir"
+        default: "240"
+      chunks:
+        description: "Jumlah chunk paralel"
+        default: "8"
+      pct:
+        description: "Persentase resolusi render (50 = 540x960, upscale lokal)"
+        default: "50"
+  push:
+    branches: [main]
+    paths: [render-request.json]
+
+permissions:
+  contents: write
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.mk.outputs.matrix }}
+      pct: ${{ steps.mk.outputs.pct }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: mk
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          if "${{ github.event_name }}" == "workflow_dispatch":
+              a = int("${{ inputs.frame_start }}"); b = int("${{ inputs.frame_end }}")
+              n = int("${{ inputs.chunks }}"); pct = "${{ inputs.pct }}"
+          else:
+              req = json.load(open("render-request.json"))
+              a = int(req.get("frame_start", 1)); b = int(req.get("frame_end", 240))
+              n = int(req.get("chunks", 8)); pct = str(req.get("pct", 50))
+          total = b - a + 1
+          per = (total + n - 1) // n
+          ranges, s = [], a
+          while s <= b:
+              e = min(s + per - 1, b)
+              ranges.append({"start": s, "end": e})
+              s = e + 1
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write("matrix=" + json.dumps({"include": ranges}) + "\n")
+              f.write("pct=" + pct + "\n")
+          print("ranges:", ranges, "pct:", pct)
+          EOF
+
+  render:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender + Mesa (Eevee headless)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq blender libegl1 libegl-mesa0 libgl1-mesa-dri libgles2 fonts-dejavu-core > /dev/null
+          pip install --quiet pillow
+          blender --version | head -1
+      - name: Generate tekstur (PNG tidak disimpan di repo)
+        run: cd scene && python3 make_sign.py
+      - name: Render chunk ${{ matrix.start }}-${{ matrix.end }}
+        env:
+          RENDER_PCT: ${{ needs.setup.outputs.pct }}
+        run: |
+          cd scene
+          blender -b -P scene.py -- anim ${{ matrix.start }} ${{ matrix.end }}
+          ls frames | wc -l
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frames-${{ matrix.start }}-${{ matrix.end }}
+          path: scene/frames/*.png
+          retention-days: 7
+
+  assemble:
+    needs: render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: allframes
+          pattern: frames-*
+          merge-multiple: true
+      - name: Komposit overlay + encode mp4
+        run: |
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null
+          pip install --quiet pillow
+          mkdir -p scene/frames
+          cp allframes/*.png scene/frames/
+          cd scene && python3 composite.py && ls -la blender-proof-01.mp4
+      - name: Commit video ke folder renders/
+        run: |
+          mkdir -p renders
+          cp scene/blender-proof-01.mp4 "renders/video-$(date +%Y%m%d-%H%M%S).mp4"
+          cp scene/blender-proof-01.mp4 renders/latest.mp4
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add renders/
+          git commit -m "render: video $(date +%Y-%m-%d\ %H:%M:%S)"
+          git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video-final
+          path: scene/blender-proof-01.mp4
+          retention-days: 7
